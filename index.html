@@ -75,9 +75,39 @@
         .toast {
             animation: fadeInOut 3s ease-in-out forwards;
         }
+
+        /* 新增：Splash Screen 動畫 */
+        #splashScreen {
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .splash-exit {
+            opacity: 0;
+            transform: translateY(-20px);
+            pointer-events: none;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body class="bg-bg-100 text-text-100 min-h-screen pb-24">
+
+    <!-- 新增：開場動畫 (Splash Screen) -->
+    <div id="splashScreen" class="fixed inset-0 z-[100] bg-bg-100 flex flex-col items-center justify-center">
+        <div class="relative w-32 h-32 mb-6 pulse-animation">
+            <img src="apple-touch-icon.png" alt="MyCollectURL Logo" class="w-full h-full object-contain drop-shadow-xl rounded-2xl" onerror="this.src='https://placehold.co/128x128/d4eaf7/00668c?text=MyCollectURL'">
+        </div>
+        <h1 class="text-2xl font-bold text-accent-200 tracking-wide">MyCollectURL</h1>
+        <p class="text-sm text-text-200 mt-2 flex items-center gap-2">
+            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-accent-100"></i>
+            載入資料中...
+        </p>
+    </div>
 
     <!-- 頂部導航 -->
     <nav class="glass-nav fixed top-0 w-full z-30 px-4 py-3 flex justify-between items-center transition-all">
@@ -278,12 +308,27 @@
         window.onload = async () => {
             loadLocalData();
             updateCategoryDropdowns();
-            renderPosts();
             
             if (apiUrl) {
-                await syncFromCloud();
+                // 如果有綁定 API，先同步，同步完再渲染並關閉 Splash
+                await syncFromCloud(true);
+            } else {
+                // 如果沒綁定，直接渲染並延遲一下關閉 Splash 讓使用者看得到動畫
+                renderPosts();
+                setTimeout(closeSplashScreen, 800);
             }
         };
+
+        // 新增：關閉 Splash Screen 的函數
+        function closeSplashScreen() {
+            const splash = document.getElementById('splashScreen');
+            if (splash) {
+                splash.classList.add('splash-exit');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                }, 500); // 等待淡出動畫結束
+            }
+        }
 
         // ==== 資料讀取與儲存邏輯 ====
         function loadLocalData() {
@@ -308,9 +353,12 @@
         }
 
         // ==== 雲端同步邏輯 (GAS API) ====
-        async function syncFromCloud() {
-            if (!apiUrl) return;
-            showSyncStatus("🔄 同步中...", "bg-primary-100 text-accent-200");
+        async function syncFromCloud(isInitialLoad = false) {
+            if (!apiUrl) {
+                if (isInitialLoad) closeSplashScreen();
+                return;
+            }
+            if (!isInitialLoad) showSyncStatus("🔄 同步中...", "bg-primary-100 text-accent-200");
             
             try {
                 const response = await fetch(`${apiUrl}?action=read`);
@@ -333,11 +381,17 @@
                         posts = [];
                     }
                     saveLocalData();
-                    showSyncStatus("✅ 同步完成", "bg-primary-100 text-accent-200", 2000);
+                    if (!isInitialLoad) showSyncStatus("✅ 同步完成", "bg-primary-100 text-accent-200", 2000);
                 }
             } catch (e) {
                 console.error("Sync read error", e);
-                showSyncStatus("❌ 同步失敗，請檢查 API 網址", "bg-bg-300 text-text-100", 3000);
+                if (!isInitialLoad) showSyncStatus("❌ 同步失敗，請檢查 API 網址", "bg-bg-300 text-text-100", 3000);
+            } finally {
+                // 不管成功或失敗，初始化載入時都要關閉 Splash Screen
+                if (isInitialLoad) {
+                    renderPosts(); // 確保資料更新後再渲染
+                    closeSplashScreen();
+                }
             }
         }
 
