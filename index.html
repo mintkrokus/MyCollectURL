@@ -6,11 +6,11 @@
     <!-- PWA / 手機加入主畫面設定 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="MyCollect">
+    <meta name="apple-mobile-web-app-title" content="MyCollectURL">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" href="apple-touch-icon.png">
     
-    <title>Picki - 跨平台社群收藏</title>
+    <title>MyCollectURL</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -171,7 +171,6 @@
                         <select id="postCategory" class="flex-1 p-3 bg-bg-200 border-none rounded-xl focus:ring-2 focus:ring-accent-100 outline-none text-text-100 appearance-none font-medium">
                             <!-- JS 注入 -->
                         </select>
-                        <!-- 解決無法更改分類的關鍵：新增按鈕 -->
                         <button type="button" onclick="promptNewCategory()" class="px-4 bg-primary-100 text-accent-200 rounded-xl font-medium hover:bg-primary-200 transition-colors whitespace-nowrap shadow-sm">
                             + 新增
                         </button>
@@ -270,7 +269,6 @@
 
         // ==== 全域狀態 ====
         let posts = [];
-        // 預設分類 (當本地與雲端都沒有時使用)
         let categories = ['未分類', '學習', '工作', '靈感', '待看']; 
         let apiUrl = localStorage.getItem('picki_api_url') || '';
         let aiSuggestedTags = [];
@@ -293,7 +291,7 @@
             if (savedPosts) {
                 posts = JSON.parse(savedPosts);
             } else {
-                posts = []; // 徹底清空預設資料
+                posts = [];
             }
 
             const savedCategories = localStorage.getItem('picki_categories');
@@ -319,7 +317,6 @@
                 const result = await response.json();
                 
                 if (result.status === 'success' && result.data) {
-                    // 解析從 GAS 來的 CSV-like 資料
                     if (result.data.length > 0) {
                         posts = result.data.map(row => ({
                             id: row.id,
@@ -336,12 +333,10 @@
                         posts = [];
                     }
                     saveLocalData();
-                    // 已把原本的綠色改為您指定的 Primary/Accent 配色
                     showSyncStatus("✅ 同步完成", "bg-primary-100 text-accent-200", 2000);
                 }
             } catch (e) {
                 console.error("Sync read error", e);
-                // 失敗時改為灰色底色，避免破壞整體美感
                 showSyncStatus("❌ 同步失敗，請檢查 API 網址", "bg-bg-300 text-text-100", 3000);
             }
         }
@@ -351,7 +346,6 @@
             showSyncStatus("☁️ 儲存至雲端...", "bg-primary-100 text-accent-200");
             
             try {
-                // 將 tags 陣列轉為字串以利儲存
                 const dataToSave = posts.map(p => ({
                     ...p,
                     tags: p.tags.join(',')
@@ -364,38 +358,11 @@
                 const result = await response.json();
                 
                 if (result.status === 'success') {
-                    // 已把原本的綠色改為您指定的 Primary/Accent 配色
                     showSyncStatus("✅ 已儲存至雲端", "bg-primary-100 text-accent-200", 2000);
                 }
             } catch (e) {
                 console.error("Sync write error", e);
                 showSyncStatus("❌ 雲端儲存失敗", "bg-bg-300 text-text-100", 3000);
-            }
-        }
-
-        async function syncToCloud() {
-            if (!apiUrl) return;
-            showSyncStatus("☁️ 儲存至雲端...", "bg-primary-100 text-accent-200");
-            
-            try {
-                // 將 tags 陣列轉為字串以利儲存
-                const dataToSave = posts.map(p => ({
-                    ...p,
-                    tags: p.tags.join(',')
-                }));
-
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'save', data: dataToSave })
-                });
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    showSyncStatus("✅ 已儲存至雲端", "bg-green-100 text-green-700", 2000);
-                }
-            } catch (e) {
-                console.error("Sync write error", e);
-                showSyncStatus("❌ 雲端儲存失敗", "bg-red-100 text-red-600", 3000);
             }
         }
 
@@ -414,9 +381,8 @@
             }
         }
 
-        // ==== 分類管理 (解決無法選擇的問題) ====
+        // ==== 分類管理 ====
         function updateCategoryDropdowns() {
-            // 更新首頁過濾器
             const filter = document.getElementById('mainCategoryFilter');
             const currentFilterVal = filter.value;
             filter.innerHTML = '<option value="all">所有收藏</option>';
@@ -425,7 +391,6 @@
             });
             if(categories.includes(currentFilterVal)) filter.value = currentFilterVal;
 
-            // 更新新增貼文的下拉選單
             const postCat = document.getElementById('postCategory');
             const currentPostVal = postCat.value;
             postCat.innerHTML = '';
@@ -443,7 +408,6 @@
                     categories.push(cleanCat);
                     localStorage.setItem('picki_categories', JSON.stringify(categories));
                     updateCategoryDropdowns();
-                    // 自動選擇剛新增的分類
                     document.getElementById('postCategory').value = cleanCat;
                     showToast(`已新增分類：${cleanCat}`);
                 } else {
@@ -452,7 +416,7 @@
             }
         }
 
-        // ==== 智慧抓取與社群平台解析 (解決 Threads 抓取錯誤) ====
+        // ==== 智慧抓取與社群平台解析 ====
         function debounceFetchMetadata() {
             const url = document.getElementById('postUrl').value;
             clearTimeout(fetchTimeout);
@@ -464,7 +428,6 @@
             }, 800);
         }
 
-        // 專門解析社群網址的自訂邏輯
         function extractPlatformInfo(url) {
             let platform = 'web';
             let author = null;
@@ -484,7 +447,7 @@
                 else if (host.includes('instagram.com')) {
                     platform = 'instagram';
                     const match = path.match(/\/(p|reel)\/([a-zA-Z0-9_-]+)/);
-                    if(match) author = 'Instagram Post'; // IG doesn't always put user in url easily
+                    if(match) author = 'Instagram Post'; 
                 }
                 else if (host.includes('twitter.com') || host.includes('x.com')) {
                     platform = 'twitter';
@@ -502,22 +465,19 @@
             try {
                 const pInfo = extractPlatformInfo(url);
                 
-                // 呼叫 Microlink (通用抓取)
                 const response = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
                 const data = await response.json();
                 
                 if (data.status === 'success') {
                     let title = data.data.title || '';
                     let desc = data.data.description || '';
-                    // 如果 Microlink 抓到的作者是無效的，或是特定的字眼，就用我們自己解析的
                     let mlAuthor = data.data.author || data.data.publisher || '';
                     let author = pInfo.author || mlAuthor;
                     
                     if (pInfo.platform === 'threads' && (mlAuthor === 'Threads' || mlAuthor === '@Threads')) {
-                        author = pInfo.author; // 強制替換為正確的 @帳號
+                        author = pInfo.author; 
                     }
 
-                    // 清理標題贅字
                     if (pInfo.titleCleaner) {
                         title = pInfo.titleCleaner(title);
                         if (!title || title.trim() === '') title = `${author} 的貼文`;
@@ -527,7 +487,6 @@
                     document.getElementById('postDesc').value = desc;
                     document.getElementById('postAuthor').value = author;
 
-                    // AI 智慧標籤預測 (簡單關鍵字比對)
                     const textToAnalyze = (title + ' ' + desc).toLowerCase();
                     const tagRules = {
                         'ai': ['ai', '人工智慧', 'chatgpt', 'gemini', 'midjourney'],
@@ -598,7 +557,6 @@
                 return matchCat && matchSearch;
             });
 
-            // 依照時間排序 (最新在最前)
             filteredPosts.sort((a, b) => b.timestamp - a.timestamp);
 
             if (filteredPosts.length === 0) {
@@ -671,7 +629,7 @@
             }
 
             saveLocalData();
-            syncToCloud(); // 觸發背景同步
+            syncToCloud(); 
             closeModal('addModal');
         }
 
@@ -687,9 +645,8 @@
                 document.getElementById('postDesc').value = post.desc;
                 
                 document.getElementById('modalTitle').textContent = "編輯收藏";
-                openAddModal(false); // 打開但不清空
+                openAddModal(false); 
                 
-                // 自動展開進階區
                 const adv = document.getElementById('advancedFields');
                 const chev = document.getElementById('advChevron');
                 adv.classList.remove('hidden');
@@ -713,7 +670,6 @@
                 document.getElementById('postId').value = '';
                 document.getElementById('modalTitle').textContent = "新增收藏";
                 document.getElementById('aiTagBtn').classList.add('hidden');
-                // 收起進階
                 document.getElementById('advancedFields').classList.add('hidden');
                 document.getElementById('advChevron').style.transform = 'rotate(0deg)';
             }
@@ -792,7 +748,7 @@
                 localStorage.setItem('picki_api_url', apiUrl);
                 closeModal('settingsModal');
                 showToast("API 綁定成功！開始同步...");
-                await syncFromCloud(); // 綁定後立即把雲端資料抓下來蓋過本地
+                await syncFromCloud(); 
             } else {
                 alert("請輸入有效的 API URL");
             }
@@ -801,7 +757,7 @@
         function exportCSV() {
             if(posts.length === 0) return alert('目前沒有資料可匯出');
             
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // Add BOM for Excel
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += "標題,網址,作者,分類,標籤,備註\n";
             
             posts.forEach(p => {
@@ -829,7 +785,7 @@
             const confirmMsg = "警告：這將會清除您『瀏覽器上』的所有收藏資料！\n如果您有綁定雲端，建議先去 Google 試算表備份。\n\n確定要清除嗎？";
             if(confirm(confirmMsg)) {
                 posts = [];
-                categories = ['未分類', '學習', '工作', '靈感', '待看']; // 恢復預設分類
+                categories = ['未分類', '學習', '工作', '靈感', '待看']; 
                 apiUrl = '';
                 localStorage.removeItem('picki_posts');
                 localStorage.removeItem('picki_categories');
